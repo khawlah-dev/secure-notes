@@ -25,7 +25,7 @@ The SQLite database is created locally under `instance/` and is intentionally no
 Railway can run this app with the included `railway.json` start command:
 
 ```bash
-gunicorn one_file_app:app
+gunicorn --bind 0.0.0.0:${PORT:-8000} one_file_app:app
 ```
 
 Set these Railway variables before deploying:
