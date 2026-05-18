@@ -43,12 +43,21 @@ def ensure_sqlite_parent(database_uri):
     os.makedirs(os.path.dirname(database_path), exist_ok=True)
 
 
-SECRET_ENCRYPTION_KEY = require_env("SECRET_ENCRYPTION_KEY").encode("utf-8")
-cipher = Fernet(SECRET_ENCRYPTION_KEY)
+try:
+    SECRET_ENCRYPTION_KEY = require_env("SECRET_ENCRYPTION_KEY").encode("utf-8")
+    cipher = Fernet(SECRET_ENCRYPTION_KEY)
+except ValueError as exc:
+    raise RuntimeError(
+        "SECRET_ENCRYPTION_KEY must be a valid Fernet key. "
+        "Generate one with: python3 -c \"from cryptography.fernet import Fernet; "
+        "print(Fernet.generate_key().decode())\""
+    ) from exc
+
 DATABASE_URI = normalize_database_uri(os.environ.get("DATABASE_URL", "sqlite:///notes.db"))
 ensure_sqlite_parent(DATABASE_URI)
 
 app = Flask(__name__)
+os.makedirs(app.instance_path, exist_ok=True)
 app.config["SECRET_KEY"] = require_env("FLASK_SECRET_KEY")
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URI
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
