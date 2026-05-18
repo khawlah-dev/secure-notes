@@ -23,12 +23,34 @@ def require_env(name):
     return value
 
 
+def normalize_database_uri(database_uri):
+    if database_uri.startswith("postgres://"):
+        return database_uri.replace("postgres://", "postgresql://", 1)
+    return database_uri
+
+
+def ensure_sqlite_parent(database_uri):
+    if database_uri.startswith("sqlite:////"):
+        database_path = "/" + database_uri.removeprefix("sqlite:////")
+    elif database_uri.startswith("sqlite:///"):
+        database_path = database_uri.removeprefix("sqlite:///")
+    else:
+        return
+
+    if not database_path or database_path == ":memory:" or not os.path.isabs(database_path):
+        return
+
+    os.makedirs(os.path.dirname(database_path), exist_ok=True)
+
+
 SECRET_ENCRYPTION_KEY = require_env("SECRET_ENCRYPTION_KEY").encode("utf-8")
 cipher = Fernet(SECRET_ENCRYPTION_KEY)
+DATABASE_URI = normalize_database_uri(os.environ.get("DATABASE_URL", "sqlite:///notes.db"))
+ensure_sqlite_parent(DATABASE_URI)
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = require_env("FLASK_SECRET_KEY")
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///notes.db"
+app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URI
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
@@ -610,6 +632,11 @@ def home():
     return redirect("/login")
 
 
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok"})
+
+
 @app.route("/register", methods=["GET", "POST"])
 def register():
     error = ""
@@ -832,4 +859,6 @@ with app.app_context():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5003)
+    port = int(os.environ.get("PORT", "5003"))
+    debug = os.environ.get("FLASK_DEBUG") == "1"
+    app.run(host="0.0.0.0", port=port, debug=debug)
